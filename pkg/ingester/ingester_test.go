@@ -472,3 +472,71 @@ func TestIngesterMaxLabelNamesPerSeries(t *testing.T) {
 
 	assert.Equal(t, expected, res)
 }
+
+func BenchmarkNewSeriesCreation(b *testing.B) {
+	// Create a million series, in 10 streams with 10 streams appending to existing series.
+	series := 1000000
+	createStreams := 100
+	existingStreams := 100
+
+	batchSize := 100
+	batches := series / (createStreams * batchSize)
+
+	cfg := defaultIngesterTestConfig()
+
+	testData := struct {
+		existingSeries [][]*client.WriteRequest
+
+		newSeries [][]*client.WriteRequest
+	}{}
+
+	for i := 0; i < existingStreams; i++ {
+		reqs := make([]*client.WriteRequest, 0, batches)
+		for j := 0; j < batches; j++ {
+			reqs = append(reqs, client.ToWriteRequest(matrixToSamples(buildTestMatrix(batchSize, 5, i*batchSize))))
+		}
+		testData.existingSeries = append(testData.existingSeries, reqs)
+	}
+
+	for i := 0; i < createStreams; i++ {
+		reqs := make([]*client.WriteRequest, 0, batches)
+		for j := 0; j < batches; j++ {
+			reqs = append(reqs, client.ToWriteRequest(matrixToSamples(buildTestMatrix(batchSize, 5, (existingStreams+i)*batches*batchSize+j*batchSize))))
+		}
+		testData.newSeries = append(testData.newSeries, reqs)
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		ctx := user.InjectOrgID(context.Background(), "1")
+		store := newTestStore()
+		ing, err := New(cfg, store)
+		require.NoError(b, err)
+
+		var wg sync.WaitGroup
+		for _, reqs := range testData.existingSeries {
+			wg.Add(1)
+
+			go func(reqs []*client.WriteRequest) {
+				for _, req := range reqs {
+					ing.Push(ctx, req)
+				}
+
+				wg.Done()
+			}(reqs)
+		}
+		for _, reqs := range testData.newSeries {
+			wg.Add(1)
+
+			go func(reqs []*client.WriteRequest) {
+				for _, req := range reqs {
+					ing.Push(ctx, req)
+				}
+
+				wg.Done()
+			}(reqs)
+		}
+
+		wg.Wait()
+	}
+}
