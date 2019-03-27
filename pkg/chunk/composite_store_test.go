@@ -25,6 +25,10 @@ func (m mockStore) Get(tx context.Context, from, through model.Time, matchers ..
 	return nil, nil
 }
 
+func (m mockStore) GetChunkRefs(tx context.Context, from, through model.Time, matchers ...*labels.Matcher) ([][]Chunk, []*Fetcher, error) {
+	return nil, nil, nil
+}
+
 func (m mockStore) Stop() {}
 
 func TestCompositeStore(t *testing.T) {
