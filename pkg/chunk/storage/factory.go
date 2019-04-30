@@ -32,7 +32,7 @@ type Config struct {
 	IndexCacheValidity time.Duration
 	memcacheClient     cache.MemcachedClientConfig
 
-	indexQueriesCacheConfig cache.Config
+	IndexQueriesCacheConfig cache.Config `yaml:"index_queries_cache_config,omitempty"`
 }
 
 // RegisterFlags adds the flags required to configure this flag set.
@@ -48,7 +48,7 @@ func (cfg *Config) RegisterFlags(f *flag.FlagSet) {
 	f.IntVar(&cfg.IndexCacheSize, "store.index-cache-size", 0, "Deprecated: Use -store.index-cache-read.*; Size of in-memory index cache, 0 to disable.")
 	cfg.memcacheClient.RegisterFlagsWithPrefix("index.", "Deprecated: Use -store.index-cache-read.*;", f)
 
-	cfg.indexQueriesCacheConfig.RegisterFlagsWithPrefix("store.index-cache-read.", "Cache config for index entry reading. ", f)
+	cfg.IndexQueriesCacheConfig.RegisterFlagsWithPrefix("store.index-cache-read.", "Cache config for index entry reading. ", f)
 	f.DurationVar(&cfg.IndexCacheValidity, "store.index-cache-validity", 5*time.Minute, "Cache validity for active index entries. Should be no higher than -ingester.max-chunk-idle.")
 }
 
@@ -77,7 +77,7 @@ func NewStore(cfg Config, storeCfg chunk.StoreConfig, schemaCfg chunk.SchemaConf
 	if len(caches) > 0 {
 		tieredCache = cache.NewTiered(caches)
 	} else {
-		tieredCache, err = cache.New(cfg.indexQueriesCacheConfig)
+		tieredCache, err = cache.New(cfg.IndexQueriesCacheConfig)
 		if err != nil {
 			return nil, err
 		}
