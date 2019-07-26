@@ -143,7 +143,7 @@ func (c *haTracker) loop(ctx context.Context) {
 		defer c.electedLock.Unlock()
 		chunks := strings.SplitN(key, "/", 2)
 		if replica.Replica != c.elected[key].Replica {
-			electedReplicaChanges.WithLabelValues(chunks[0], chunks[1])
+			electedReplicaChanges.WithLabelValues(chunks[0], chunks[1]).Inc()
 		}
 		c.elected[key] = *replica
 		electedReplicaTimestamp.WithLabelValues(chunks[0], chunks[1]).Set(float64(replica.ReceivedAt))

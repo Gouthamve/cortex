@@ -50,11 +50,16 @@ var (
 		Name:      "distributor_non_ha_samples_received_total",
 		Help:      "The total number of received samples for a user that has HA tracking turned on, but the sample didn't contain both HA labels.",
 	}, []string{"user"})
+	allowedSamples = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "cortex",
+		Name:      "distributor_allowed_samples_total",
+		Help:      "The total number of deduplicated samples.",
+	}, []string{"user", "cluster", "replica"})
 	dedupedSamples = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "cortex",
 		Name:      "distributor_deduped_samples_total",
 		Help:      "The total number of deduplicated samples.",
-	}, []string{"user", "cluster"})
+	}, []string{"user", "cluster", "replica"})
 	sendDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "cortex",
 		Name:      "distributor_send_duration_seconds",
@@ -264,7 +269,6 @@ func (d *Distributor) checkSample(ctx context.Context, userID, cluster, replica 
 	// If the sample doesn't have either HA label, accept it.
 	// At the moment we want to accept these samples by default.
 	if cluster == "" || replica == "" {
-		nonHASamples.WithLabelValues(userID).Inc()
 		return false, nil
 	}
 
@@ -305,14 +309,16 @@ func (d *Distributor) Push(ctx context.Context, req *client.WriteRequest) (*clie
 		if err != nil {
 			if resp, ok := httpgrpc.HTTPResponseFromError(err); ok && resp.GetCode() == 202 {
 				// These samples have been deduped.
-				numSamples := 0
-				for _, ts := range req.Timeseries {
-					numSamples += len(ts.Samples)
-				}
-				dedupedSamples.WithLabelValues(userID, cluster).Add(float64(numSamples))
+				dedupedSamples.WithLabelValues(userID, cluster, replica).Add(float64(numSamples))
 			}
 
 			return nil, err
+		}
+
+		if removeReplica {
+			allowedSamples.WithLabelValues(userID, cluster, replica).Add(float64(numSamples))
+		} else {
+			nonHASamples.WithLabelValues(userID).Add(float64(numSamples))
 		}
 	}
 
