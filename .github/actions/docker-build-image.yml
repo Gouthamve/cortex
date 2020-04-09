@@ -1,0 +1,7 @@
+name: build-image-setup
+description: 'Sets up the docker environment to run inside the build-image'
+runs:
+  using: docker
+  image: 'docker://quay.io/cortexproject/build-image:introduce-faillint-to-ci-ca69fd09b-WIP'
+  volumes:
+    - ./:/go/src/github.com/cortexproject/cortex

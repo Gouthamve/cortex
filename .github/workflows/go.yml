@@ -1,0 +1,40 @@
+name: Go
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    container: 
+      image: 'docker://gouthamve/build-image:gh-actions-ab560fdba'
+    steps:
+    - name: checkout the code
+      uses: actions/checkout@v2
+    - name: Lint
+      run: make BUILD_IN_CONTAINER=false lint 
+    - name: Check vendor directory is consistent.
+      run: make BUILD_IN_CONTAINER=false mod-check
+    - name: Check protos are consistent.
+      run: make BUILD_IN_CONTAINER=false check-protos
+    - name: Check generated documentation is consistent.
+      run: make BUILD_IN_CONTAINER=false check-doc
+  test:
+    runs-on: ubuntu-latest
+    container: 
+      image: 'docker://gouthamve/build-image:gh-actions-ab560fdba'
+    services:
+      cassandra:
+        image: cassandra:3.11.6
+        env:
+          JVM_OPTS: "-Xms1024M -Xmx1024M"
+    steps:
+    - name: checkout the code
+      uses: actions/checkout@v2
+    - run: git show
+    - name: Test
+      run: CASSANDRA_TEST_ADDRESSES=localhost:9042 make BUILD_IN_CONTAINER=false test
+
